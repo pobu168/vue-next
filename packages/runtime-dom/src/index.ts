@@ -20,7 +20,7 @@ declare module '@vue/reactivity' {
     runtimeDOMBailTypes: Node | Window
   }
 }
-
+// 渲染相关的一些配置，比如更新属性的方法，操作 DOM 的方法
 const rendererOptions = extend({ patchProp, forcePatchProp }, nodeOps)
 
 // lazy create the renderer - this makes core renderer logic tree-shakable
@@ -29,6 +29,7 @@ let renderer: Renderer<Element> | HydrationRenderer
 
 let enabledHydration = false
 
+// 延时创建渲染器，当用户只依赖响应式包的时候，可以通过 tree-shaking 移除核心渲染逻辑相关的代码
 function ensureRenderer() {
   return renderer || (renderer = createRenderer<Node, Element>(rendererOptions))
 }
@@ -51,6 +52,7 @@ export const hydrate = ((...args) => {
 }) as RootHydrateFunction
 
 export const createApp = ((...args) => {
+  // 创建app对象
   const app = ensureRenderer().createApp(...args)
 
   if (__DEV__) {
@@ -58,15 +60,20 @@ export const createApp = ((...args) => {
   }
 
   const { mount } = app
+  // 重写mount方法
   app.mount = (containerOrSelector: Element | ShadowRoot | string): any => {
+    // 标准化容器
     const container = normalizeContainer(containerOrSelector)
     if (!container) return
     const component = app._component
+    // 如组件对象没有定义 render 函数和 template 模板，则取容器的 innerHTML 作为组件模板内容
     if (!isFunction(component) && !component.render && !component.template) {
       component.template = container.innerHTML
     }
     // clear content before mounting
+    // 挂载前清空容器内容
     container.innerHTML = ''
+    // 真正的挂载
     const proxy = mount(container)
     if (container instanceof Element) {
       container.removeAttribute('v-cloak')
@@ -108,6 +115,7 @@ function injectNativeTagCheck(app: App) {
 function normalizeContainer(
   container: Element | ShadowRoot | string
 ): Element | null {
+  // 如果是字符串选择器，转换成DOM对象
   if (isString(container)) {
     const res = document.querySelector(container)
     if (__DEV__ && !res) {
