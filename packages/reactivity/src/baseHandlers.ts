@@ -43,14 +43,18 @@ const arrayInstrumentations: Record<string, Function> = {}
 ;(['includes', 'indexOf', 'lastIndexOf'] as const).forEach(key => {
   const method = Array.prototype[key] as any
   arrayInstrumentations[key] = function(this: unknown[], ...args: unknown[]) {
+    // toRaw 可以把响应式对象转成原始数据
     const arr = toRaw(this)
     for (let i = 0, l = this.length; i < l; i++) {
+      // 依赖收集
       track(arr, TrackOpTypes.GET, i + '')
     }
     // we run the method using the original args first (which may be reactive)
+    // 先尝试用参数本身，可能是响应式数据
     const res = method.apply(arr, args)
     if (res === -1 || res === false) {
       // if that didn't work, run it again using raw values.
+      // 如果失败，再尝试把参数转成原始数据
       return method.apply(arr, args.map(toRaw))
     } else {
       return res
@@ -83,13 +87,13 @@ function createGetter(isReadonly = false, shallow = false) {
     }
 
     const targetIsArray = isArray(target)
-
+    // arrayInstrumentations 包含一些对数组的修改的函数
     if (!isReadonly && targetIsArray && hasOwn(arrayInstrumentations, key)) {
       return Reflect.get(arrayInstrumentations, key, receiver)
     }
-
+    // 求值
     const res = Reflect.get(target, key, receiver)
-
+    // 内置 Symbol key 不需要依赖收集
     if (
       isSymbol(key)
         ? builtInSymbols.has(key as symbol)
@@ -97,7 +101,7 @@ function createGetter(isReadonly = false, shallow = false) {
     ) {
       return res
     }
-
+    // 依赖收集
     if (!isReadonly) {
       track(target, TrackOpTypes.GET, key)
     }
