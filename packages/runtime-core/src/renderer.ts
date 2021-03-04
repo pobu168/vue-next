@@ -1742,10 +1742,18 @@ function baseCreateRenderer(
   ) => {
     let i = 0
     const l2 = c2.length
+    // 旧节点的尾部索引
     let e1 = c1.length - 1 // prev ending index
+    // 新节点的尾部索引
     let e2 = l2 - 1 // next ending index
 
     // 1. sync from start
+    /*
+      1、从头部开始同步
+      同步头部节点就是从头部开始，依次对比新节点和旧节点，
+      如果它们相同的则执行 patch 更新节点；
+      如果不同或者索引 i 大于索引 e1 或者 e2，则同步过程结束
+    */
     // (a b) c
     // (a b) d e
     while (i <= e1 && i <= e2) {
@@ -1754,6 +1762,7 @@ function baseCreateRenderer(
         ? cloneIfMounted(c2[i] as VNode)
         : normalizeVNode(c2[i]))
       if (isSameVNodeType(n1, n2)) {
+        // 相同的节点，递归执行 patch 更新节点
         patch(
           n1,
           n2,
@@ -1771,6 +1780,11 @@ function baseCreateRenderer(
     }
 
     // 2. sync from end
+    /*
+      2、从尾部开始同步
+      从尾部开始，依次对比新节点和旧节点，如果相同的则执行 patch 更新节点；
+      如果不同或者索引 i 大于索引 e1 或者 e2，则同步过程结束
+    */
     // a (b c)
     // d e (b c)
     while (i <= e1 && i <= e2) {
@@ -1797,6 +1811,11 @@ function baseCreateRenderer(
     }
 
     // 3. common sequence + mount
+    /*
+      挂载剩余的新节点
+      如果索引 i 大于尾部索引 e1 且 i 小于等于 e2，
+      那么从索引 i 开始到索引 e2 之间，直接挂载新子树这部分的节点
+    */
     // (a b)
     // (a b) c
     // i = 2, e1 = 1, e2 = 2
@@ -1808,6 +1827,7 @@ function baseCreateRenderer(
         const nextPos = e2 + 1
         const anchor = nextPos < l2 ? (c2[nextPos] as VNode).el : parentAnchor
         while (i <= e2) {
+          // 挂载新节点
           patch(
             null,
             (c2[i] = optimized
@@ -1825,6 +1845,11 @@ function baseCreateRenderer(
     }
 
     // 4. common sequence + unmount
+    // 普通序列删除多域的旧节点
+    /* 
+      如果索引 i 大于尾部索引 e2，那么从索引 i 开始到索引 e1 之间，
+      直接删除旧子树这部分的节点
+    */
     // (a b) c
     // (a b)
     // i = 2, e1 = 2, e2 = 1
@@ -1833,6 +1858,7 @@ function baseCreateRenderer(
     // i = 0, e1 = 0, e2 = -1
     else if (i > e2) {
       while (i <= e1) {
+        // 删除节点
         unmount(c1[i], parentComponent, parentSuspense, true)
         i++
       }
@@ -1843,10 +1869,13 @@ function baseCreateRenderer(
     // [i ... e2 + 1]: a b [e d c h] f g
     // i = 2, e1 = 4, e2 = 5
     else {
+      // 旧子序列开始索引，从 i开始记录
       const s1 = i // prev starting index
+      // 新子序列开始索引，从 i 开始记录
       const s2 = i // next starting index
 
       // 5.1 build key:index map for newChildren
+      // 根据 key 建立新子序列的索引图
       const keyToNewIndexMap: Map<string | number, number> = new Map()
       for (i = s2; i <= e2; i++) {
         const nextChild = (c2[i] = optimized
@@ -1866,28 +1895,38 @@ function baseCreateRenderer(
 
       // 5.2 loop through old children left to be patched and try to patch
       // matching nodes & remove nodes that are no longer present
+      // 正序遍历旧子序列，找到匹配的节点更新，删除不在新子序列中的节点，判断是否有移动节点
       let j
+      // 新子序列已更新节点的数量
       let patched = 0
+      // 新子序列待更新节点的数量，等于新子序列的长度
       const toBePatched = e2 - s2 + 1
+      // 是否存在要移动的节点
       let moved = false
       // used to track whether any node has moved
+      // 用于跟踪判断是否有节点移动
       let maxNewIndexSoFar = 0
       // works as Map<newIndex, oldIndex>
       // Note that oldIndex is offset by +1
       // and oldIndex = 0 is a special value indicating the new node has
       // no corresponding old node.
       // used for determining longest stable subsequence
+      // 这个数组存储新子序列中的元素在旧子序列节点的索引，用于确定最长递增子序列
       const newIndexToOldIndexMap = new Array(toBePatched)
+      // 0 是一个特殊的值，如果遍历完了仍有元素的值为0，则说明这个新节点没有对应的旧节点
       for (i = 0; i < toBePatched; i++) newIndexToOldIndexMap[i] = 0
-
+      // 正序遍历旧的子节点
       for (i = s1; i <= e1; i++) {
+        // 拿到每一个旧子序列节点
         const prevChild = c1[i]
         if (patched >= toBePatched) {
           // all new children have been patched so this can only be a removal
+          // 所有新的子序列节点都已经更新，剩余的节点删除
           unmount(prevChild, parentComponent, parentSuspense, true)
           continue
         }
         let newIndex
+        // 查找旧子序列中的节点在新子序列中的索引
         if (prevChild.key != null) {
           newIndex = keyToNewIndexMap.get(prevChild.key)
         } else {
@@ -1903,14 +1942,18 @@ function baseCreateRenderer(
           }
         }
         if (newIndex === undefined) {
+          // 找不到说明旧子序列已经不存在于新子序列中，则删除该节点
           unmount(prevChild, parentComponent, parentSuspense, true)
         } else {
+          // 更新新子序列中的元素在旧子序列中的索引，这里加 1 偏移，是为了避免 i为 0 的特殊情况
           newIndexToOldIndexMap[newIndex - s2] = i + 1
+          // maxNewIndexSoFar 始终存储的是上次求值的 newIndex，如果不是一直递增，则说明有移动
           if (newIndex >= maxNewIndexSoFar) {
             maxNewIndexSoFar = newIndex
           } else {
             moved = true
           }
+          // 更新新旧子序列中匹配的节点
           patch(
             prevChild,
             c2[newIndex] as VNode,
@@ -1927,18 +1970,23 @@ function baseCreateRenderer(
 
       // 5.3 move and mount
       // generate longest stable subsequence only when nodes have moved
+      // 移动和挂载新节点
+      // 仅当节点移动时生成最长递增子序列
       const increasingNewIndexSequence = moved
         ? getSequence(newIndexToOldIndexMap)
         : EMPTY_ARR
       j = increasingNewIndexSequence.length - 1
       // looping backwards so that we can use last patched node as anchor
+      // 倒叙遍历以便使我们可以使用最后更新的节点作为锚点
       for (i = toBePatched - 1; i >= 0; i--) {
         const nextIndex = s2 + i
         const nextChild = c2[nextIndex] as VNode
+        // 锚点指向上一个更新的节点，如果 nextIndex 超过新子节点的长度，则指向 parentAnchor
         const anchor =
           nextIndex + 1 < l2 ? (c2[nextIndex + 1] as VNode).el : parentAnchor
         if (newIndexToOldIndexMap[i] === 0) {
           // mount new
+          // 挂载新的子节点
           patch(
             null,
             nextChild,
@@ -1952,9 +2000,11 @@ function baseCreateRenderer(
           // move if:
           // There is no stable subsequence (e.g. a reverse)
           // OR current node is not among the stable sequence
+          // 灭有最长递增子序列 （reverse 的场景）或则当前的节点索引不在最长递增子序列中，需要移动
           if (j < 0 || i !== increasingNewIndexSequence[j]) {
             move(nextChild, container, anchor, MoveType.REORDER)
           } else {
+            // 倒序递增子序列
             j--
           }
         }
