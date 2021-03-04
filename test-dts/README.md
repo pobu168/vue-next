@@ -2,7 +2,7 @@
 
 Tests Typescript types to ensure the types remain as expected.
 
-## Configuration
+## Configuration 
 
 ### tsconfig.json
 
