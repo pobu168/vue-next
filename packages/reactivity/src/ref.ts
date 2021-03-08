@@ -57,18 +57,23 @@ class RefImpl<T> {
   public readonly __v_isRef = true
 
   constructor(private _rawValue: T, public readonly _shallow = false) {
+    // 如果是对象或者数组类型，则转换成一个 reactive 对象
     this._value = _shallow ? _rawValue : convert(_rawValue)
   }
 
   get value() {
+    // 收集依赖，key 为固定的 value
     track(toRaw(this), TrackOpTypes.GET, 'value')
     return this._value
   }
 
   set value(newVal) {
+    // setter 只处理 value 属性的修改
     if (hasChanged(toRaw(newVal), this._rawValue)) {
+      // 判断有变化后更新值
       this._rawValue = newVal
       this._value = this._shallow ? newVal : convert(newVal)
+      // 派发通知
       trigger(toRaw(this), TriggerOpTypes.SET, 'value', newVal)
     }
   }
@@ -76,6 +81,7 @@ class RefImpl<T> {
 
 function createRef(rawValue: unknown, shallow = false) {
   if (isRef(rawValue)) {
+    // 如果传入的就是一个 ref ，那么返回自身即可，处理嵌套 ref 的情况
     return rawValue
   }
   return new RefImpl(rawValue, shallow)
