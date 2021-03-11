@@ -155,7 +155,7 @@ function doWatch(
       )
     }
   }
-
+  // source 不合法的时候报警告
   const warnInvalidSource = (s: unknown) => {
     warn(
       `Invalid watch source: `,
@@ -168,9 +168,11 @@ function doWatch(
   let getter: () => any
   let forceTrigger = false
   if (isRef(source)) {
+    // ref 对象，创建一个访问source.value 的 getter 函数
     getter = () => (source as Ref).value
     forceTrigger = !!(source as Ref)._shallow
   } else if (isReactive(source)) {
+    // reactive 对象，创建一个访问source 的 getter 函数
     getter = () => source
     deep = true
   } else if (isArray(source)) {
@@ -187,6 +189,7 @@ function doWatch(
         }
       })
   } else if (isFunction(source)) {
+    // 是一个函数，判断 cb 是否存在
     if (cb) {
       // getter with cb
       getter = () =>
@@ -219,6 +222,7 @@ function doWatch(
   }
 
   let cleanup: () => void
+  // 注册无效回调函数
   const onInvalidate: InvalidateCbRegistrator = (fn: () => void) => {
     cleanup = runner.options.onStop = () => {
       callWithErrorHandling(fn, instance, ErrorCodes.WATCH_CLEANUP)
@@ -239,7 +243,7 @@ function doWatch(
     }
     return NOOP
   }
-
+  // 旧值初始值
   let oldValue = isArray(source) ? [] : INITIAL_WATCHER_VALUE
   const job: SchedulerJob = () => {
     if (!runner.active) {
@@ -247,18 +251,22 @@ function doWatch(
     }
     if (cb) {
       // watch(source, cb)
+      // 求得新值
       const newValue = runner()
       if (deep || forceTrigger || hasChanged(newValue, oldValue)) {
         // cleanup before running cb again
+        // 执行清理函数
         if (cleanup) {
           cleanup()
         }
         callWithAsyncErrorHandling(cb, instance, ErrorCodes.WATCH_CALLBACK, [
           newValue,
           // pass undefined as the old value when it's changed for the first time
+          // 第一次更改时传递旧值为 undefined
           oldValue === INITIAL_WATCHER_VALUE ? undefined : oldValue,
           onInvalidate
         ])
+        // 更新旧值
         oldValue = newValue
       }
     } else {
@@ -273,47 +281,56 @@ function doWatch(
 
   let scheduler: ReactiveEffectOptions['scheduler']
   if (flush === 'sync') {
+    // 同步
     scheduler = job
   } else if (flush === 'post') {
+    // 进入异步队列，组件更新后执行
     scheduler = () => queuePostRenderEffect(job, instance && instance.suspense)
   } else {
     // default: 'pre'
     scheduler = () => {
       if (!instance || instance.isMounted) {
+        // 进入异步队列，组件更新前执行
         queuePreFlushCb(job)
       } else {
         // with 'pre' option, the first call must happen before
         // the component is mounted so it is called synchronously.
+        // 如果组件还没挂载，则同步执行确保在组件挂载前
         job()
       }
     }
   }
 
   const runner = effect(getter, {
+    // 延时执行
     lazy: true,
     onTrack,
     onTrigger,
     scheduler
   })
-
+  // 在组件实例中记录这个 effect
   recordInstanceBoundEffect(runner, instance)
 
   // initial run
+  // 初次执行
   if (cb) {
     if (immediate) {
       job()
     } else {
+      // 求旧值
       oldValue = runner()
     }
   } else if (flush === 'post') {
     queuePostRenderEffect(runner, instance && instance.suspense)
   } else {
+    // 没有 cb 的情况
     runner()
   }
 
   return () => {
     stop(runner)
     if (instance) {
+      // 移除组件 effects 对这个 runner 的引用
       remove(instance.effects!, runner)
     }
   }
