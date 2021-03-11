@@ -53,14 +53,17 @@ class ComputedRefImpl<T> {
 
   get value() {
     if (this._dirty) {
+      // 只有数据为脏的时候才会重新计算
       this._value = this.effect()
       this._dirty = false
     }
+    // 依赖收集，收集运行访问该极端属性的 activeEffect
     track(toRaw(this), TrackOpTypes.GET, 'value')
     return this._value
   }
 
   set value(newValue: T) {
+    // 计算属性的 setter
     this._setter(newValue)
   }
 }
