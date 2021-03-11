@@ -34,11 +34,15 @@ class ComputedRefImpl<T> {
     private readonly _setter: ComputedSetter<T>,
     isReadonly: boolean
   ) {
+    // 创建副作用函数
     this.effect = effect(getter, {
+      // 延时执行
       lazy: true,
+      // 调度执行的实现
       scheduler: () => {
         if (!this._dirty) {
           this._dirty = true
+          // 派发通知，通知运行访问该计算属性的 activeEffect
           trigger(toRaw(this), TriggerOpTypes.SET, 'value')
         }
       }
@@ -68,10 +72,13 @@ export function computed<T>(
 export function computed<T>(
   getterOrOptions: ComputedGetter<T> | WritableComputedOptions<T>
 ) {
+  // getter 函数
   let getter: ComputedGetter<T>
+  // setter 函数
   let setter: ComputedSetter<T>
-
+  // 标准化参数
   if (isFunction(getterOrOptions)) {
+    // 表面传入的是 getter 函数，不能修改计算属性的值
     getter = getterOrOptions
     setter = __DEV__
       ? () => {
