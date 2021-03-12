@@ -1369,9 +1369,11 @@ function baseCreateRenderer(
         // 渲染组件
         let vnodeHook: VNodeHook | null | undefined
         const { el, props } = initialVNode
+        // 获取组件实例上通过 onBeforeMount 钩子函数和 onMount 注册的钩子函数
         const { bm, m, parent } = instance
 
         // beforeMount hook
+        // 执行 beforemount 钩子函数
         if (bm) {
           invokeArrayFns(bm)
         }
@@ -1425,6 +1427,7 @@ function baseCreateRenderer(
           initialVNode.el = subTree.el
         }
         // mounted hook
+        // 执行 mounted 钩子函数
         if (m) {
           queuePostRenderEffect(m, parentSuspense)
         }
@@ -1454,6 +1457,7 @@ function baseCreateRenderer(
         // updateComponent
         // This is triggered by mutation of component's own state (next: null)
         // OR parent calling processComponent (next: VNode)
+        // 获取组件实例上通过 onBeforeUpdate 钩子函数和 onUpdated 注册的钩子函数
         // next表示新的组件vnode
         let { next, bu, u, parent, vnode } = instance
         let originNext = next
@@ -1471,6 +1475,7 @@ function baseCreateRenderer(
         }
 
         // beforeUpdate hook
+        // 执行 beforeUpdate 钩子函数
         if (bu) {
           invokeArrayFns(bu)
         }
@@ -1496,7 +1501,7 @@ function baseCreateRenderer(
         if (__DEV__) {
           startMeasure(instance, `patch`)
         }
-        // 组件更新核心逻辑，更具新旧 vnode 做patch
+        // 组件更新核心逻辑，根据新旧子树 vnode 做patch
         patch(
           prevTree,
           nextTree,
@@ -1522,6 +1527,7 @@ function baseCreateRenderer(
           updateHOCHostEl(instance, nextTree.el)
         }
         // updated hook
+        // 执行 updated 钩子函数
         if (u) {
           queuePostRenderEffect(u, parentSuspense)
         }
@@ -2229,9 +2235,11 @@ function baseCreateRenderer(
 
     const { bum, effects, update, subTree, um } = instance
     // beforeUnmount hook
+    // 执行 beforeUnmount 钩子函数
     if (bum) {
       invokeArrayFns(bum)
     }
+    // 清理组件引用的 effects 副作用函数
     if (effects) {
       for (let i = 0; i < effects.length; i++) {
         stop(effects[i])
@@ -2239,11 +2247,14 @@ function baseCreateRenderer(
     }
     // update may be null if a component is unmounted before its async
     // setup has resolved.
+    // 如果一个异步组件在加载前就销毁了，则不会注册副作用渲染函数
     if (update) {
       stop(update)
+      // 调用 unmount 销毁子树
       unmount(subTree, instance, parentSuspense, doRemove)
     }
     // unmounted hook
+    // 执行 unmounted 钩子函数
     if (um) {
       queuePostRenderEffect(um, parentSuspense)
     }

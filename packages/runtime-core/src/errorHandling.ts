@@ -106,14 +106,18 @@ export function handleError(
   if (instance) {
     let cur = instance.parent
     // the exposed instance is the render proxy to keep it consistent with 2.x
+    // 为了兼容 2.x 版本，暴露组件实例给钩子函数
     const exposedInstance = instance.proxy
     // in production the hook receives only the error code
+    // 获取错误信息
     const errorInfo = __DEV__ ? ErrorTypeStrings[type] : type
+    // 尝试向上查找所有父组件，执行 errorCaptured 钩子函数
     while (cur) {
       const errorCapturedHooks = cur.ec
       if (errorCapturedHooks) {
         for (let i = 0; i < errorCapturedHooks.length; i++) {
           if (
+            // 如果执行的 errorCaptured 钩子函数并返回 true，则停止向上查找
             errorCapturedHooks[i](err, exposedInstance, errorInfo) === false
           ) {
             return
@@ -134,6 +138,7 @@ export function handleError(
       return
     }
   }
+  // 向控制台输出未处理的错误
   logError(err, type, contextVNode, throwInDev)
 }
 
