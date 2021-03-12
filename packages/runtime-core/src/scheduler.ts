@@ -57,6 +57,11 @@ export function nextTick(
   return fn ? p.then(this ? fn.bind(this) : fn) : p
 }
 
+// 异步任务队列 
+// const queue = [] 
+// 队列任务执行完后执行的回调函数队列 
+// const pendingQueue = []
+
 export function queueJob(job: SchedulerJob) {
   // the dedupe search uses the startIndex argument of Array.includes()
   // by default the search index includes the current job that is being run
@@ -111,6 +116,7 @@ function queueCb(
     // if cb is an array, it is a component lifecycle hook which can only be
     // triggered by a job, which is already deduped in the main queue, so
     // we can skip duplicate check here to improve perf
+    // 如果是数组，把它拍平成一堆
     pendingQueue.push(...cb)
   }
   queueFlush()
@@ -155,6 +161,7 @@ export function flushPreFlushCbs(
 
 export function flushPostFlushCbs(seen?: CountMap) {
   if (pendingPostFlushCbs.length) {
+    // 拷贝副本
     const deduped = [...new Set(pendingPostFlushCbs)]
     pendingPostFlushCbs.length = 0
 
@@ -205,6 +212,8 @@ function flushJobs(seen?: CountMap) {
   //    priority number)
   // 2. If a component is unmounted during a parent component's update,
   //    its update can be skipped.
+  // 组建的额更新是先父后子
+  // 如果一个组件在父组件更新过程中卸载，它自身的更新应该被跳过
   queue.sort((a, b) => getId(a) - getId(b))
 
   try {
@@ -227,6 +236,7 @@ function flushJobs(seen?: CountMap) {
     currentFlushPromise = null
     // some postFlushCb queued jobs!
     // keep flushing until it drains.
+    // 一些 postFlishCb 执行过程中再次添加异步任务，递归 flushJobs 会把他们都执行完毕
     if (queue.length || pendingPostFlushCbs.length) {
       flushJobs(seen)
     }
